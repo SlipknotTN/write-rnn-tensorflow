@@ -19,11 +19,17 @@ class Model():
     else:
       raise Exception("model type not supported: {}".format(args.model))
 
+    # TF 1.0
+    #cell = cell_fn(args.rnn_size, state_is_tuple=False)
+    # TF 1.3
     def get_cell():
       return cell_fn(args.rnn_size, state_is_tuple=False)
 
     cell = tf.contrib.rnn.MultiRNNCell(
-        [get_cell() for _ in range(args.rnn_size)])
+        # TF 1.0
+        #[cell] * args.num_layers, state_is_tuple=False)
+        # TF 1.3
+        [get_cell() for _ in range(args.num_layers)])
 
     if (infer == False and args.keep_prob < 1): # training mode
       cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob = args.keep_prob)
@@ -45,10 +51,12 @@ class Model():
     # inputs = tf.split(axis=1, num_or_size_splits=args.seq_length, value=self.input_data)
     # inputs = [tf.squeeze(input_, [1]) for input_ in inputs]
     inputs = tf.unstack(self.input_data, axis=1)
-    
-    # outputs, state_out = tf.contrib.legacy_seq2seq.rnn_decoder(inputs, self.state_in, cell, loop_function=None, scope='rnnlm')
-    outputs, state_out = tf.contrib.legacy_seq2seq.rnn_decoder(inputs, zero_state, cell, loop_function=None, scope='rnnlm')
 
+    print("Creating sequence2sequence rnn decoder...")
+    # TF 1.0
+    #outputs, state_out = tf.contrib.legacy_seq2seq.rnn_decoder(inputs, self.state_in, cell, loop_function=None, scope='rnnlm')
+    # TF 1.3
+    outputs, state_out = tf.contrib.legacy_seq2seq.rnn_decoder(inputs, zero_state, cell, loop_function=None, scope='rnnlm')
 
     output = tf.reshape(tf.concat(axis=1, values=outputs), [-1, args.rnn_size])
     output = tf.nn.xw_plus_b(output, output_w, output_b)
@@ -141,6 +149,7 @@ class Model():
     self.corr = o_corr
     self.eos = o_eos
 
+    print("Setting optmizer...")
     lossfunc = get_lossfunc(o_pi, o_mu1, o_mu2, o_sigma1, o_sigma2, o_corr, o_eos, x1_data, x2_data, eos_data)
     self.cost = lossfunc / (args.batch_size * args.seq_length)
     
@@ -149,6 +158,7 @@ class Model():
 
     self.lr = tf.Variable(0.0, trainable=False)
     tvars = tf.trainable_variables()
+
     grads, _ = tf.clip_by_global_norm(tf.gradients(self.cost, tvars), args.grad_clip)
     optimizer = tf.train.AdamOptimizer(self.lr)
     self.train_op = optimizer.apply_gradients(zip(grads, tvars))

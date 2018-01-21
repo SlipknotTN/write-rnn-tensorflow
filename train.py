@@ -8,6 +8,8 @@ import pickle
 
 from utils import DataLoader
 from model import Model
+from tqdm import tqdm
+
 
 def main():
   parser = argparse.ArgumentParser()
@@ -42,6 +44,7 @@ def main():
   args = parser.parse_args()
   train(args)
 
+
 def train(args):
     data_loader = DataLoader(args.batch_size, args.seq_length, args.data_scale)
 
@@ -54,11 +57,11 @@ def train(args):
     model = Model(args)
 
     with tf.Session() as sess:
-        summary_writer = tf.summary.FileWriter(os.path.join(args.model_dir, 'log'), sess.graph) 
+        summary_writer = tf.summary.FileWriter(os.path.join(args.model_dir, 'log'), sess.graph)
         
         tf.global_variables_initializer().run()
         saver = tf.train.Saver(tf.global_variables())
-        for e in range(args.num_epochs):
+        for e in tqdm(range(args.num_epochs), unit="epoch"):
             sess.run(tf.assign(model.lr, args.learning_rate * (args.decay_rate ** e)))
             data_loader.reset_batch_pointer()
             v_x, v_y = data_loader.validation_data()
@@ -87,6 +90,7 @@ def train(args):
                     checkpoint_path = os.path.join(args.model_dir, 'model.ckpt')
                     saver.save(sess, checkpoint_path, global_step = e * data_loader.num_batches + b)
                     print("model saved to {}".format(checkpoint_path))
+
 
 if __name__ == '__main__':
   main()
